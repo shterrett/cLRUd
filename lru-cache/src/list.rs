@@ -4,21 +4,26 @@
 
 use std::rc::Rc;
 use std::cell::{Ref, RefCell};
+use std::hash::Hash;
 
-pub struct List<T> {
-    head: Link<T>,
-    tail: Link<T>
+pub struct List<T>
+    where T: Hash + Eq {
+    head: Option<Link<T>>,
+    tail: Option<Link<T>>
 }
 
-type Link<T> = Option<Rc<RefCell<Node<T>>>>;
+pub type Link<T> = Rc<RefCell<Node<T>>>;
 
-struct Node<T> {
+#[derive(Debug)]
+struct Node<T>
+    where T: Hash + Eq {
     elem: T,
-    next: Link<T>,
-    prev: Link<T>
+    next: Option<Link<T>>,
+    prev: Option<Link<T>>
 }
 
-impl<T> Node<T> {
+impl<T> Node<T>
+    where T: Hash + Eq {
     fn new(elem: T) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Node {
             elem: elem,
@@ -28,9 +33,19 @@ impl<T> Node<T> {
     }
 }
 
-pub struct IntoIter<T>(List<T>);
+impl<T> PartialEq for Node<T>
+    where T: Hash + Eq {
+    fn eq(&self, other: &Node<T>) -> bool {
+        self.elem == other.elem
+    }
+}
 
-impl<T> List<T> {
+impl<T> Eq for Node<T> where T: Hash + Eq {}
+
+pub struct IntoIter<T>(List<T>) where T: Hash + Eq;
+
+impl<T> List<T>
+    where T: Hash + Eq {
     pub fn new() -> Self {
         List {
             head: None,
@@ -38,20 +53,15 @@ impl<T> List<T> {
         }
     }
 
-    pub fn peek_head(&self) -> Option<Ref<T>> {
-        self.head.as_ref().map(|node|
-            Ref::map(node.borrow(), |node| &node.elem)
-        )
+    pub fn peek_head(&self) -> Option<&Link<T>> {
+        self.head.as_ref()
     }
 
-    pub fn peek_tail(&self) -> Option<Ref<T>> {
-        self.tail.as_ref().map(|node|
-            Ref::map(node.borrow(), |node| &node.elem)
-        )
+    pub fn peek_tail(&self) -> Option<&Link<T>> {
+        self.tail.as_ref()
     }
 
-    pub fn unshift(&mut self, elem: T) {
-        let new_head = Node::new(elem);
+    pub fn unshift(&mut self, new_head: Link<T>) {
         match self.head.take() {
             Some(old_head) => {
                 old_head.borrow_mut().prev = Some(new_head.clone());
@@ -65,7 +75,7 @@ impl<T> List<T> {
         }
     }
 
-    pub fn shift(&mut self) -> Option<T> {
+    pub fn shift(&mut self) -> Option<Link<T>> {
         self.head.take().map(|old_head| {
             match old_head.borrow_mut().next.take() {
                 Some(next) => {
@@ -76,12 +86,11 @@ impl<T> List<T> {
                     self.tail.take();
                 }
             }
-            Rc::try_unwrap(old_head).ok().unwrap().into_inner().elem
+            old_head
         })
     }
 
-    pub fn push(&mut self, elem: T) {
-        let new_tail = Node::new(elem);
+    pub fn push(&mut self, new_tail: Link<T>) {
         match self.tail.take() {
             Some(old_tail) => {
                 old_tail.borrow_mut().next = Some(new_tail.clone());
@@ -95,7 +104,7 @@ impl<T> List<T> {
         }
     }
 
-    pub fn pop(&mut self) -> Option<T> {
+    pub fn pop(&mut self) -> Option<Link<T>> {
         self.tail.take().map(|old_tail| {
             match old_tail.borrow_mut().prev.take() {
                 Some(prev) => {
@@ -106,7 +115,7 @@ impl<T> List<T> {
                     self.head.take();
                 }
             }
-            Rc::try_unwrap(old_tail).ok().unwrap().into_inner().elem
+            old_tail
         })
     }
 
@@ -115,22 +124,27 @@ impl<T> List<T> {
     }
 }
 
-impl<T> Iterator for IntoIter<T> {
-    type Item = T;
-    fn next(&mut self) -> Option<T> {
+impl<T> Iterator for IntoIter<T>
+    where T: Hash + Eq {
+    type Item = Link<T>;
+    fn next(&mut self) -> Option<Link<T>> {
         self.0.shift()
     }
 }
 
-impl<T> DoubleEndedIterator for IntoIter<T> {
-    fn next_back(&mut self) -> Option<T> {
+impl<T> DoubleEndedIterator for IntoIter<T>
+    where T: Hash + Eq {
+    fn next_back(&mut self) -> Option<Link<T>> {
         self.0.pop()
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::List;
+    use super::{ List, Link, Node };
+    use std::borrow::Borrow;
+    use std::cell::Ref;
+    use std::rc::Rc;
 
     #[test]
     fn shift_and_unshift() {
@@ -138,17 +152,17 @@ mod test {
 
         assert_eq!(list.shift(), None);
 
-        list.unshift(1);
-        list.unshift(2);
-        list.unshift(3);
+        list.unshift(Node::new(1));
+        list.unshift(Node::new(2));
+        list.unshift(Node::new(3));
 
-        assert_eq!(list.shift(), Some(3));
+        assert_eq!(list.shift(), Some(Node::new(3)));
 
-        list.unshift(5);
+        list.unshift(Node::new(5));
 
-        assert_eq!(list.shift(), Some(5));
-        assert_eq!(list.shift(), Some(2));
-        assert_eq!(list.shift(), Some(1));
+        assert_eq!(list.shift(), Some(Node::new(5)));
+        assert_eq!(list.shift(), Some(Node::new(2)));
+        assert_eq!(list.shift(), Some(Node::new(1)));
 
         assert_eq!(list.shift(), None);
     }
@@ -159,17 +173,17 @@ mod test {
 
         assert_eq!(list.pop(), None);
 
-        list.push(1);
-        list.push(2);
-        list.push(3);
+        list.push(Node::new(1));
+        list.push(Node::new(2));
+        list.push(Node::new(3));
 
-        assert_eq!(list.pop(), Some(3));
-        assert_eq!(list.pop(), Some(2));
+        assert_eq!(list.pop(), Some(Node::new(3)));
+        assert_eq!(list.pop(), Some(Node::new(2)));
 
-        list.push(4);
+        list.push(Node::new(4));
 
-        assert_eq!(list.pop(), Some(4));
-        assert_eq!(list.pop(), Some(1));
+        assert_eq!(list.pop(), Some(Node::new(4)));
+        assert_eq!(list.pop(), Some(Node::new(1)));
 
         assert_eq!(list.pop(), None);
     }
@@ -178,16 +192,16 @@ mod test {
     fn peek() {
         let mut list = List::new();
 
-        list.unshift(1);
-        list.unshift(2);
+        list.unshift(Node::new(1));
+        list.unshift(Node::new(2));
 
-        assert_eq!(&*list.peek_head().unwrap(), &2);
-        assert_eq!(&*list.peek_tail().unwrap(), &1);
+        assert_eq!(&*list.peek_head().unwrap(), &Node::new(2));
+        assert_eq!(&*list.peek_tail().unwrap(), &Node::new(1));
 
         list.shift();
 
-        assert_eq!(&*list.peek_head().unwrap(), &1);
-        assert_eq!(&*list.peek_tail().unwrap(), &1);
+        assert_eq!(&*list.peek_head().unwrap(), &Node::new(1));
+        assert_eq!(&*list.peek_tail().unwrap(), &Node::new(1));
 
         list.shift();
 
@@ -198,30 +212,42 @@ mod test {
     #[test]
     fn into_iter() {
         let mut list = List::new();
-        list.push(1);
-        list.push(2);
-        list.push(3);
-        list.push(4);
+        list.push(Node::new(1));
+        list.push(Node::new(2));
+        list.push(Node::new(3));
+        list.push(Node::new(4));
 
         let mut iter = list.into_iter();
 
-        assert_eq!(iter.next(), Some(1));
-        assert_eq!(iter.next_back(), Some(4));
-        assert_eq!(iter.next(), Some(2));
-        assert_eq!(iter.next_back(), Some(3));
+        assert_eq!(iter.next(), Some(Node::new(1)));
+        assert_eq!(iter.next_back(), Some(Node::new(4)));
+        assert_eq!(iter.next(), Some(Node::new(2)));
+        assert_eq!(iter.next_back(), Some(Node::new(3)));
         assert_eq!(iter.next(), None);
         assert_eq!(iter.next_back(), None);
 
         let mut list_2 = List::new();
 
-        list_2.push(1);
-        list_2.push(2);
-        list_2.push(3);
+        list_2.push(Node::new(1));
+        list_2.push(Node::new(2));
+        list_2.push(Node::new(3));
 
         let mut iter_rev = list_2.into_iter().rev();
-        assert_eq!(iter_rev.next(), Some(3));
-        assert_eq!(iter_rev.next(), Some(2));
-        assert_eq!(iter_rev.next(), Some(1));
+        assert_eq!(iter_rev.next(), Some(Node::new(3)));
+        assert_eq!(iter_rev.next(), Some(Node::new(2)));
+        assert_eq!(iter_rev.next(), Some(Node::new(1)));
         assert_eq!(iter_rev.next(), None);
+    }
+
+    #[test]
+    fn remove() {
+        let mut list = List::new();
+        list.push(Node::new(1));
+        list.push(Node::new(2));
+
+        //let node: &Link<i32> = list.head.map(|l| Rc::borrow(&l)).unwrap();
+
+        //list.push(3);
+        //list.push(4);
     }
 }
