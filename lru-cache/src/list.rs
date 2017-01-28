@@ -3,8 +3,8 @@
 // http://cglab.ca/~abeinges/blah/too-many-lists/book/fourth-layout.html
 
 use std::rc::Rc;
-use std::cell::{Ref, RefCell};
-use std::hash::Hash;
+use std::cell::RefCell;
+use std::hash::{ Hash, Hasher };
 
 pub struct List<T>
     where T: Hash + Eq {
@@ -15,7 +15,7 @@ pub struct List<T>
 pub type Link<T> = Rc<RefCell<Node<T>>>;
 
 #[derive(Debug)]
-struct Node<T>
+pub struct Node<T>
     where T: Hash + Eq {
     elem: T,
     next: Option<Link<T>>,
@@ -41,6 +41,12 @@ impl<T> PartialEq for Node<T>
 }
 
 impl<T> Eq for Node<T> where T: Hash + Eq {}
+
+impl<T> Hash for Node<T>
+    where T: Hash + Eq {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.elem.hash(state);
+    }}
 
 pub struct IntoIter<T>(List<T>) where T: Hash + Eq;
 
@@ -119,6 +125,29 @@ impl<T> List<T>
         })
     }
 
+    pub fn remove(&mut self, target: &Link<T>) {
+        if target.borrow().next.is_none() {
+            self.pop();
+        } else if target.borrow().prev.is_none() {
+            self.shift();
+        } else {
+            let mut node = target.borrow_mut();
+            let next = node.next.take().unwrap();
+            let prev = node.prev.take().unwrap();
+            {
+                next.borrow_mut().prev = Some(prev.clone());
+            }
+            {
+                prev.borrow_mut().next = Some(next.clone());
+            }
+        }
+    }
+
+    pub fn promote(&mut self, target: Link<T>) {
+        self.remove(&target);
+        self.unshift(target);
+    }
+
     pub fn into_iter(self) -> IntoIter<T> {
         IntoIter(self)
     }
@@ -141,10 +170,7 @@ impl<T> DoubleEndedIterator for IntoIter<T>
 
 #[cfg(test)]
 mod test {
-    use super::{ List, Link, Node };
-    use std::borrow::Borrow;
-    use std::cell::Ref;
-    use std::rc::Rc;
+    use super::{ List, Node };
 
     #[test]
     fn shift_and_unshift() {
@@ -245,9 +271,124 @@ mod test {
         list.push(Node::new(1));
         list.push(Node::new(2));
 
-        //let node: &Link<i32> = list.head.map(|l| Rc::borrow(&l)).unwrap();
+        let node = Node::new(3);
+        let node_ref = node.clone();
 
-        //list.push(3);
-        //list.push(4);
+        list.push(node);
+        list.push(Node::new(4));
+
+        list.remove(&node_ref);
+
+        let mut iter = list.into_iter();
+        assert_eq!(iter.next(), Some(Node::new(1)));
+        assert_eq!(iter.next(), Some(Node::new(2)));
+        assert_eq!(iter.next(), Some(Node::new(4)));
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn remove_head() {
+        let mut list = List::new();
+        let node = Node::new(1);
+        let node_ref = node.clone();
+
+        list.push(node);
+        list.push(Node::new(2));
+        list.push(Node::new(3));
+        list.push(Node::new(4));
+
+        list.remove(&node_ref);
+
+        let mut iter = list.into_iter();
+        assert_eq!(iter.next(), Some(Node::new(2)));
+        assert_eq!(iter.next(), Some(Node::new(3)));
+        assert_eq!(iter.next(), Some(Node::new(4)));
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn remove_tail() {
+        let mut list = List::new();
+        list.push(Node::new(1));
+        list.push(Node::new(2));
+        list.push(Node::new(3));
+
+        let node = Node::new(4);
+        let node_ref = node.clone();
+
+        list.push(node);
+
+        list.remove(&node_ref);
+
+        let mut iter = list.into_iter();
+        assert_eq!(iter.next(), Some(Node::new(1)));
+        assert_eq!(iter.next(), Some(Node::new(2)));
+        assert_eq!(iter.next(), Some(Node::new(3)));
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn promote() {
+        let mut list = List::new();
+        list.push(Node::new(1));
+        list.push(Node::new(2));
+
+        let node = Node::new(3);
+        let node_ref = node.clone();
+
+        list.push(node);
+        list.push(Node::new(4));
+
+        list.promote(node_ref);
+
+        let mut iter = list.into_iter();
+        assert_eq!(iter.next(), Some(Node::new(3)));
+        assert_eq!(iter.next(), Some(Node::new(1)));
+        assert_eq!(iter.next(), Some(Node::new(2)));
+        assert_eq!(iter.next(), Some(Node::new(4)));
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn promote_head() {
+        let mut list = List::new();
+        let node = Node::new(1);
+        let node_ref = node.clone();
+
+        list.push(node);
+        list.push(Node::new(2));
+        list.push(Node::new(3));
+        list.push(Node::new(4));
+
+        list.promote(node_ref);
+
+        let mut iter = list.into_iter();
+        assert_eq!(iter.next(), Some(Node::new(1)));
+        assert_eq!(iter.next(), Some(Node::new(2)));
+        assert_eq!(iter.next(), Some(Node::new(3)));
+        assert_eq!(iter.next(), Some(Node::new(4)));
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn promote_tail() {
+        let mut list = List::new();
+        list.push(Node::new(1));
+        list.push(Node::new(2));
+        list.push(Node::new(3));
+
+        let node = Node::new(4);
+        let node_ref = node.clone();
+
+        list.push(node);
+
+        list.promote(node_ref);
+
+        let mut iter = list.into_iter();
+        assert_eq!(iter.next(), Some(Node::new(4)));
+        assert_eq!(iter.next(), Some(Node::new(1)));
+        assert_eq!(iter.next(), Some(Node::new(2)));
+        assert_eq!(iter.next(), Some(Node::new(3)));
+        assert_eq!(iter.next(), None);
     }
 }
