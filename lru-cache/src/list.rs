@@ -17,14 +17,14 @@ pub type Link<T> = Rc<RefCell<Node<T>>>;
 #[derive(Debug)]
 pub struct Node<T>
     where T: Hash + Eq {
-    elem: T,
+    pub elem: T,
     next: Option<Link<T>>,
     prev: Option<Link<T>>
 }
 
 impl<T> Node<T>
     where T: Hash + Eq {
-    fn new(elem: T) -> Rc<RefCell<Self>> {
+    pub fn new(elem: T) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Node {
             elem: elem,
             prev: None,
