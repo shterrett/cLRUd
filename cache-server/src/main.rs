@@ -5,7 +5,7 @@ extern crate tokio_service;
 extern crate byteorder;
 
 mod codec;
-use codec::CacheCommandCodec;
+mod proto;
 
 fn main() {
     println!("Hello, world!");
