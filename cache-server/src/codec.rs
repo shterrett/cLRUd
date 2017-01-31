@@ -42,17 +42,17 @@ impl CommandResult {
 
 #[derive(Debug)]
 pub struct CacheCommand {
-    command: Command,
-    key: String,
-    length: u64,
-    value: Vec<u8>
+    pub command: Command,
+    pub key: String,
+    pub length: u64,
+    pub value: Vec<u8>
 }
 
 #[derive(Debug)]
 pub struct CacheResponse {
-    response_type: CommandResult,
-    length: u64,
-    data: Vec<u8>
+    pub response_type: CommandResult,
+    pub length: u64,
+    pub data: Vec<u8>
 }
 
 pub struct CacheCommandCodec {}

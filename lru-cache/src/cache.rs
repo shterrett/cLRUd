@@ -3,7 +3,7 @@ use std::hash::Hash;
 use std::clone::Clone;
 use list::{ Node, Link, List };
 
-struct LruCache<T>
+pub struct LruCache<T>
     where T: Hash + Eq + Clone {
     capacity: usize,
     size: usize,
