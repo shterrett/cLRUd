@@ -1,0 +1,8 @@
+[package]
+name = "cache-codec"
+version = "0.1.0"
+authors = ["stuart"]
+
+[dependencies]
+tokio-core = "0.1"
+byteorder = "1"

@@ -2,7 +2,7 @@ use std::io;
 use std::sync::{ Arc, Mutex };
 use tokio_service::Service;
 use futures::{ future, Future, BoxFuture };
-use codec::{ Command, CommandResult, CacheCommand, CacheResponse };
+use cache_codec::types::{ Command, CommandResult, CacheCommand, CacheResponse };
 use lru_cache::cache::LruCache;
 
 pub struct CacheSrv {
@@ -57,7 +57,7 @@ mod test {
     use futures::Future;
     use tokio_service::Service;
     use lru_cache::cache::LruCache;
-    use codec::{ Command, CommandResult, CacheCommand };
+    use cache_codec::types::{ Command, CommandResult, CacheCommand };
     use super::{ CacheSrv };
 
     #[test]

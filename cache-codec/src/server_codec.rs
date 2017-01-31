@@ -2,62 +2,12 @@ use std::io;
 use std::str;
 use tokio_core::io::{ Codec, EasyBuf };
 use byteorder::{ ByteOrder, BigEndian };
+use types::{ Command, CacheCommand, CacheResponse };
+use helpers::parse_bytes;
 
-#[derive(PartialEq, Eq, Debug)]
-pub enum Command {
-    PUT,
-    GET
-}
+pub struct CacheServerCodec {}
 
-impl Command {
-    fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        str::from_utf8(&bytes)
-                .ok()
-                .and_then(|command| {
-                    if command == "put" {
-                        Some(Command::PUT)
-                    } else if command == "get" {
-                        Some(Command::GET)
-                    } else {
-                        None
-                    }
-                })
-    }
-}
-
-#[derive(PartialEq, Eq, Debug)]
-pub enum CommandResult {
-    SUCCESS,
-    FAILURE
-}
-
-impl CommandResult {
-    fn as_bytes(&self) -> Vec<u8> {
-        match self {
-            &CommandResult::SUCCESS => "success".to_string().as_bytes().to_vec(),
-            &CommandResult::FAILURE => "failure".to_string().as_bytes().to_vec()
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct CacheCommand {
-    pub command: Command,
-    pub key: String,
-    pub length: u64,
-    pub value: Vec<u8>
-}
-
-#[derive(Debug)]
-pub struct CacheResponse {
-    pub response_type: CommandResult,
-    pub length: u64,
-    pub data: Vec<u8>
-}
-
-pub struct CacheCommandCodec {}
-
-impl Codec for CacheCommandCodec {
+impl Codec for CacheServerCodec {
     type In = CacheCommand;
     type Out = CacheResponse;
 
@@ -95,26 +45,15 @@ impl Codec for CacheCommandCodec {
     }
 }
 
-fn parse_bytes<F, T>(buf: &mut EasyBuf, convert: F) -> Option<T>
-    where F: Fn(&[u8]) -> Option<T> {
-    buf.as_slice().iter().position(|&b| b == b'\n').and_then(|idx| {
-        let bytes = buf.drain_to(idx);
-        buf.drain_to(1);
-        convert(bytes.as_slice())
-    })
-}
-
-
-
 #[cfg(test)]
 mod test {
     use tokio_core::io::{ Codec, EasyBuf };
     use byteorder::{ BigEndian, ByteOrder };
-    use super::{ CacheCommandCodec,
-                 Command,
+    use types::{ Command,
                  CommandResult,
                  CacheResponse
                };
+    use super::CacheServerCodec;
 
     #[test]
     fn decodes_put_command_with_value() {
@@ -134,7 +73,7 @@ mod test {
         bytes.push(b'\n');
         bytes.extend(value);
 
-        let mut decoder = CacheCommandCodec {};
+        let mut decoder = CacheServerCodec {};
         let result = decoder.decode(&mut EasyBuf::from(bytes));
 
         let decoded = result.unwrap().unwrap();
@@ -160,7 +99,7 @@ mod test {
         bytes.extend(length_as_bytes);
         bytes.push(b'\n');
 
-        let mut decoder = CacheCommandCodec {};
+        let mut decoder = CacheServerCodec {};
         let result = decoder.decode(&mut EasyBuf::from(bytes));
 
         let decoded = result.unwrap().unwrap();
@@ -181,7 +120,7 @@ mod test {
             data: data.clone()
         };
 
-        let mut encoder = CacheCommandCodec {};
+        let mut encoder = CacheServerCodec {};
         let mut encoded: Vec<u8> = vec![];
         let result = encoder.encode(response, &mut encoded);
 
@@ -209,7 +148,7 @@ mod test {
             data: data.clone()
         };
 
-        let mut encoder = CacheCommandCodec {};
+        let mut encoder = CacheServerCodec {};
         let mut encoded: Vec<u8> = vec![];
         let result = encoder.encode(response, &mut encoded);
 
@@ -237,7 +176,7 @@ mod test {
             data: data.clone()
         };
 
-        let mut encoder = CacheCommandCodec {};
+        let mut encoder = CacheServerCodec {};
         let mut encoded: Vec<u8> = vec![];
         let result = encoder.encode(response, &mut encoded);
 
@@ -254,3 +193,4 @@ mod test {
         assert_eq!(encoded, expected);
     }
 }
+
