@@ -12,6 +12,9 @@ pub struct LruCache<T>
     history: List<T>
 }
 
+unsafe impl<T> Send for LruCache<T>
+    where T: Hash + Eq + Clone { }
+
 impl<T> LruCache<T>
     where T: Hash + Eq + Clone {
     pub fn new(size: usize) -> Self {
