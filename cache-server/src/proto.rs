@@ -1,13 +1,13 @@
 use std::io;
 use tokio_core::io::{ Io, Framed };
 use tokio_proto::pipeline::ServerProto;
-use codec::{ CacheCommand, CacheCommandCodec };
+use codec::{ CacheCommand, CacheResponse, CacheCommandCodec };
 
 pub struct CacheCommandProto;
 
 impl<T: Io + 'static> ServerProto<T> for CacheCommandProto {
     type Request = CacheCommand;
-    type Response = String;
+    type Response = CacheResponse;
     type Transport = Framed<T, CacheCommandCodec>;
     type BindTransport = Result<Self::Transport, io::Error>;
 

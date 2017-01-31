@@ -25,6 +25,21 @@ impl Command {
     }
 }
 
+#[derive(PartialEq, Eq, Debug)]
+pub enum CommandResult {
+    SUCCESS,
+    FAILURE
+}
+
+impl CommandResult {
+    fn as_bytes(&self) -> Vec<u8> {
+        match self {
+            &CommandResult::SUCCESS => "success".to_string().as_bytes().to_vec(),
+            &CommandResult::FAILURE => "failure".to_string().as_bytes().to_vec()
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct CacheCommand {
     command: Command,
@@ -33,11 +48,18 @@ pub struct CacheCommand {
     value: Vec<u8>
 }
 
+#[derive(Debug)]
+pub struct CacheResponse {
+    response_type: CommandResult,
+    length: u64,
+    data: Vec<u8>
+}
+
 pub struct CacheCommandCodec {}
 
 impl Codec for CacheCommandCodec {
     type In = CacheCommand;
-    type Out = String;
+    type Out = CacheResponse;
 
     fn decode(&mut self, buf: &mut EasyBuf) -> io::Result<Option<Self::In>> {
         let command = parse_bytes(buf, |bytes| Command::from_bytes(bytes));
@@ -60,8 +82,15 @@ impl Codec for CacheCommandCodec {
     }
 
     fn encode(&mut self, msg: Self::Out, buf: &mut Vec<u8>) -> io::Result<()> {
-        buf.extend(msg.as_bytes());
+        buf.extend(msg.response_type.as_bytes());
         buf.push(b'\n');
+
+        let mut length = vec![0; 8];
+        BigEndian::write_u64(&mut length, msg.length);
+        buf.extend(length.as_slice());
+        buf.push(b'\n');
+
+        buf.extend(msg.data);
         Ok(())
     }
 }
@@ -81,7 +110,11 @@ fn parse_bytes<F, T>(buf: &mut EasyBuf, convert: F) -> Option<T>
 mod test {
     use tokio_core::io::{ Codec, EasyBuf };
     use byteorder::{ BigEndian, ByteOrder };
-    use super::{ CacheCommandCodec, Command };
+    use super::{ CacheCommandCodec,
+                 Command,
+                 CommandResult,
+                 CacheResponse
+               };
 
     #[test]
     fn decodes_put_command_with_value() {
@@ -135,5 +168,89 @@ mod test {
         assert_eq!(decoded.key, "key".to_string());
         assert_eq!(decoded.length, 0);
         assert_eq!(decoded.value, vec![]);
+    }
+
+    #[test]
+    fn encodes_success_result_with_payload() {
+        let response_type = CommandResult::SUCCESS;
+        let data: Vec<u8> = "cached data".to_string().as_bytes().to_vec();
+
+        let response = CacheResponse {
+            response_type: response_type,
+            length: data.iter().len() as u64,
+            data: data.clone()
+        };
+
+        let mut encoder = CacheCommandCodec {};
+        let mut encoded: Vec<u8> = vec![];
+        let result = encoder.encode(response, &mut encoded);
+
+        let mut expected = vec![];
+        expected.extend("success".to_string().as_bytes());
+        expected.push(b'\n');
+        let mut length = vec![0; 8];
+        BigEndian::write_u64(&mut length, data.iter().len() as u64);
+        expected.extend(length);
+        expected.push(b'\n');
+        expected.extend(data);
+
+        assert!(result.is_ok());
+        assert_eq!(encoded, expected);
+    }
+
+    #[test]
+    fn encodes_success_result_with_no_payload() {
+        let response_type = CommandResult::SUCCESS;
+        let data: Vec<u8> = vec![];
+
+        let response = CacheResponse {
+            response_type: response_type,
+            length: 0 as u64,
+            data: data.clone()
+        };
+
+        let mut encoder = CacheCommandCodec {};
+        let mut encoded: Vec<u8> = vec![];
+        let result = encoder.encode(response, &mut encoded);
+
+        let mut expected = vec![];
+        expected.extend("success".to_string().as_bytes());
+        expected.push(b'\n');
+        let mut length = vec![0; 8];
+        BigEndian::write_u64(&mut length, 0 as u64);
+        expected.extend(length);
+        expected.push(b'\n');
+        expected.extend(data);
+
+        assert!(result.is_ok());
+        assert_eq!(encoded, expected);
+    }
+
+    #[test]
+    fn encodes_error_result() {
+        let response_type = CommandResult::FAILURE;
+        let data: Vec<u8> = "error message".to_string().as_bytes().to_vec();
+
+        let response = CacheResponse {
+            response_type: response_type,
+            length: data.iter().len() as u64,
+            data: data.clone()
+        };
+
+        let mut encoder = CacheCommandCodec {};
+        let mut encoded: Vec<u8> = vec![];
+        let result = encoder.encode(response, &mut encoded);
+
+        let mut expected = vec![];
+        expected.extend("failure".to_string().as_bytes());
+        expected.push(b'\n');
+        let mut length = vec![0; 8];
+        BigEndian::write_u64(&mut length, data.iter().len() as u64);
+        expected.extend(length);
+        expected.push(b'\n');
+        expected.extend(data);
+
+        assert!(result.is_ok());
+        assert_eq!(encoded, expected);
     }
 }
