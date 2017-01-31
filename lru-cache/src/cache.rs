@@ -5,8 +5,8 @@ use list::{ Node, Link, List };
 
 pub struct LruCache<T>
     where T: Hash + Eq + Clone {
-    capacity: usize,
-    size: usize,
+    capacity: u64,
+    size: u64,
     cache: HashMap<T, Vec<u8>>,
     keys: HashMap<T, Link<T>>,
     history: List<T>
@@ -17,7 +17,7 @@ unsafe impl<T> Send for LruCache<T>
 
 impl<T> LruCache<T>
     where T: Hash + Eq + Clone {
-    pub fn new(size: usize) -> Self {
+    pub fn new(size: u64) -> Self {
         LruCache {
             capacity: size,
             size: 0,
@@ -29,12 +29,12 @@ impl<T> LruCache<T>
 
     pub fn put(&mut self, key: T, value: Vec<u8>) {
         println!("Current size: {:?}", self.size);
-        while self.size + value.iter().len() > self.capacity {
+        while self.size + value.iter().len() as u64 > self.capacity {
             println!("Too big!");
             if let Some(evict) = self.history.pop() {
                 let ref e_key = evict.borrow().elem;
                 self.keys.remove(&e_key);
-                self.cache.remove(&e_key).map(|v| self.size -= v.iter().len());
+                self.cache.remove(&e_key).map(|v| self.size -= v.iter().len() as u64);
             } else {
                 //not enough space
                 return
@@ -43,11 +43,11 @@ impl<T> LruCache<T>
 
         if let Some(node) = self.keys.remove(&key) {
             let old_value = self.cache.get(&key).unwrap();
-            self.size = self.size - old_value.iter().len() + value.iter().len();
+            self.size = self.size - (old_value.iter().len() + value.iter().len()) as u64;
             self.keys.insert(key.clone(), node.clone());
             self.history.promote(node);
         } else {
-            self.size += value.iter().len();
+            self.size += value.iter().len() as u64;
             let node = Node::new(key.clone());
             self.keys.insert(key.clone(), node.clone());
             self.history.unshift(node);

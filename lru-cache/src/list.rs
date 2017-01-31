@@ -48,8 +48,10 @@ impl<T> Hash for Node<T>
         self.elem.hash(state);
     }}
 
+#[allow(dead_code)]
 pub struct IntoIter<T>(List<T>) where T: Hash + Eq;
 
+#[allow(dead_code)]
 impl<T> List<T>
     where T: Hash + Eq {
     pub fn new() -> Self {

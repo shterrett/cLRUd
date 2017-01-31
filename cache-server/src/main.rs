@@ -19,7 +19,7 @@ fn main() {
     let addr = "0.0.0.0:8080".parse().unwrap();
 
     let server = TcpServer::new(CacheCommandProto, addr);
-    let cache = Arc::new(Mutex::new(LruCache::new(usize::pow(2, 9))));
+    let cache = Arc::new(Mutex::new(LruCache::new(u64::pow(2, 9))));
 
     server.serve(move || Ok(
         CacheSrv {
