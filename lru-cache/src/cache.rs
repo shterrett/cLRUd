@@ -28,9 +28,7 @@ impl<T> LruCache<T>
     }
 
     pub fn put(&mut self, key: T, value: Vec<u8>) {
-        println!("Current size: {:?}", self.size);
         while self.size + value.iter().len() as u64 > self.capacity {
-            println!("Too big!");
             if let Some(evict) = self.history.pop() {
                 let ref e_key = evict.borrow().elem;
                 self.keys.remove(&e_key);

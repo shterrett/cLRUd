@@ -1,0 +1,7 @@
+[package]
+name = "client-example"
+version = "0.1.0"
+authors = ["stuart"]
+
+[dependencies]
+cache-client = { path = "../cache-client" }

@@ -12,6 +12,7 @@ impl Codec for CacheServerCodec {
     type Out = CacheResponse;
 
     fn decode(&mut self, buf: &mut EasyBuf) -> io::Result<Option<Self::In>> {
+        if buf.len() == 0 { return Ok(None); }
         let command = parse_bytes(buf, |bytes| Command::from_bytes(bytes));
         let key = parse_bytes(buf, |bytes| str::from_utf8(bytes).ok().map(|s| s.to_string()));
         let length = parse_bytes(buf, |bytes| Some(BigEndian::read_u64(bytes)));
