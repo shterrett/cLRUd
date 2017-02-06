@@ -11,3 +11,4 @@ tokio-proto = "0.1"
 byteorder = "1"
 cache-codec = { path = "../cache-codec" }
 lru-cache = { path = "../lru-cache" }
+clap = "2"

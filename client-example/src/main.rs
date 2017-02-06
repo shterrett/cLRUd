@@ -1,5 +1,7 @@
+extern crate clap;
 extern crate cache_client;
 
+use clap::{ Arg, App };
 use std::io;
 use std::io::{ BufReader, BufRead };
 use cache_client::{ Cacheable, CacheClient };
@@ -57,7 +59,28 @@ fn process_line(line: String, client: &CacheClient) {
 }
 
 fn main() {
-    let client = CacheClient::new("0.0.0.0:8080".to_string()).unwrap();
+    let matches = App::new("CacheClient")
+                      .version("001.0")
+                      .author("Stuart <shterrett@gmail.com>")
+                      .arg(Arg::with_name("address")
+                           .help("ip address to listen on")
+                           .short("a")
+                           .long("address")
+                           .takes_value(true))
+                      .arg(Arg::with_name("port")
+                           .help("port to listen on")
+                           .short("p")
+                           .long("port")
+                           .takes_value(true))
+                      .get_matches();
+
+
+    let mut addr = matches.value_of("address").unwrap_or("0.0.0.0").to_string();
+    let port = matches.value_of("port").unwrap_or("8080");
+    addr.push_str(":");
+    addr.push_str(port);
+
+    let client = CacheClient::new(addr).unwrap();
 
     let stdin = io::stdin();
     let reader = BufReader::new(stdin);
