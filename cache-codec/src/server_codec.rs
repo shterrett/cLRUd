@@ -3,7 +3,7 @@ use std::str;
 use tokio_core::io::{ Codec, EasyBuf };
 use byteorder::{ ByteOrder, BigEndian };
 use types::{ Command, CacheCommand, CacheResponse };
-use helpers::parse_bytes;
+use helpers::{ parse_bytes, encode_int };
 
 pub struct CacheServerCodec {}
 
@@ -17,7 +17,6 @@ impl Codec for CacheServerCodec {
         let key = parse_bytes(buf, |bytes| str::from_utf8(bytes).ok().map(|s| s.to_string()));
         let length = parse_bytes(buf, |bytes| Some(BigEndian::read_u64(bytes)));
         let mut value: Vec<u8> = vec![];
-
 
         if let (Some(cmd), Some(k), Some(l)) = (command, key, length) {
             value.extend_from_slice(buf.drain_to(l as usize).as_slice());
@@ -36,8 +35,7 @@ impl Codec for CacheServerCodec {
         buf.extend(msg.response_type.as_bytes());
         buf.push(b'\n');
 
-        let mut length = vec![0; 8];
-        BigEndian::write_u64(&mut length, msg.length);
+        let length = encode_int(msg.length);
         buf.extend(length.as_slice());
         buf.push(b'\n');
 

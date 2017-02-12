@@ -2,7 +2,7 @@ use std::io;
 use tokio_core::io::{ Codec, EasyBuf };
 use byteorder::{ ByteOrder, BigEndian };
 use types::{ CacheCommand, CommandResult, CacheResponse };
-use helpers::parse_bytes;
+use helpers::{ parse_bytes, encode_int };
 
 pub struct CacheClientCodec {}
 
@@ -34,8 +34,7 @@ impl Codec for CacheClientCodec {
         buf.extend(msg.key.as_bytes());
         buf.push(b'\n');
 
-        let mut length = vec![0; 8];
-        BigEndian::write_u64(&mut length, msg.length);
+        let length = encode_int(msg.length);
         buf.extend(length.as_slice());
         buf.push(b'\n');
 
