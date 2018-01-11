@@ -10,5 +10,5 @@ tokio-service = "0.1"
 tokio-proto = "0.1"
 byteorder = "1"
 cache-codec = { path = "../cache-codec" }
-lru-cache = { path = "../lru-cache" }
+lru-cache = { git = "https://github.com/shterrett/rust-lru-cache" }
 clap = "2"

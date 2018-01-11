@@ -7,10 +7,7 @@ build-server:
 build-codec:
 	cd cache-codec && cargo build
 
-build-cache:
-	cd lru-cache && cargo build
-
-build: build-client build-server build-codec build-cache
+build: build-client build-server build-codec
 
 test-client:
 	cd cache-client && cargo test
